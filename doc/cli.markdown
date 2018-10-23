@@ -849,10 +849,6 @@ increase verbosity
 
 ## ssh [uuid]
 
-Warning: 'balena ssh' requires an openssh-compatible client to be correctly
-installed in your shell environment. For more information (including Windows
-support) please check the README here: https://github.com/balena-io/balena-cli
-
 Use this command to get a shell into the running application container of
 your device.
 
@@ -860,19 +856,9 @@ Examples:
 
 	$ balena ssh MyApp
 	$ balena ssh 7cf02a6
-	$ balena ssh 7cf02a6 --port 8080
-	$ balena ssh 7cf02a6 -v
 	$ balena ssh 7cf02a6 -s
 
 ### Options
-
-#### --port, -p &#60;port&#62;
-
-ssh gateway port
-
-#### --verbose, -v
-
-increase verbosity
 
 #### --host, -s
 

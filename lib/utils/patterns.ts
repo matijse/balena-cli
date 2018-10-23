@@ -228,7 +228,7 @@ export function awaitDevice(uuid: string) {
 	});
 }
 
-export function inferOrSelectDevice(preferredUuid: string) {
+export function inferOrSelectDevice(preferredUuid?: string) {
 	return balena.models.device
 		.getAll()
 		.filter<BalenaSdk.Device>(device => device.is_online)
