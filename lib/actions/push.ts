@@ -30,6 +30,37 @@ enum BuildTarget {
 	Device,
 }
 
+const registrySecretJsonSchema = {
+	/*
+	Sample valid registrySecrets JSON contents:
+	  {	 "docker.example.com": {"username": "ann", "password": "hunter2"},
+		 "https://idx.docker.io/v1/": {"username": "mck", "password": "cze14"} }
+	*/
+	type: 'object',
+	patternProperties: {
+		'.+': {
+			type: 'object',
+			properties: {
+				username: { type: 'string' },
+				password: { type: 'string' },
+			},
+			additionalProperties: false,
+		},
+	},
+	additionalProperties: false,
+};
+
+interface PushParameters {
+	applicationOrDevice: string;
+}
+
+interface PushOptions {
+	source: string;
+	emulated: boolean;
+	nocache: boolean;
+	registrySecrets: string;
+}
+
 function getBuildTarget(appOrDevice: string): BuildTarget | null {
 	// First try the application regex from the api
 	if (/^[a-zA-Z0-9_-]+$/.test(appOrDevice)) {
@@ -98,30 +129,57 @@ async function getAppOwner(sdk: BalenaSDK, appName: string) {
 	return selected.extra;
 }
 
-export const push: CommandDefinition<
-	{
-		applicationOrDevice: string;
-	},
-	{
-		source: string;
-		emulated: boolean;
-		nocache: boolean;
+function parseRegistrySecrets(options: PushOptions): object {
+	const fs = require('fs');
+	const ajv = require('ajv');
+	const validator = new ajv();
+
+	let buffer = fs.readFileSync(options.registrySecrets);
+	const userSecrets: object = JSON.parse(buffer);
+
+	console.log(`parsed userSecrets: \n${userSecrets}`);
+
+	let valid: boolean = validator.validate(
+		registrySecretJsonSchema,
+		userSecrets,
+	);
+	if (!valid) {
+		throw new Error(validator.errorsText());
 	}
-> = {
+	return userSecrets;
+}
+
+export const push: CommandDefinition<PushParameters, PushOptions> = {
 	signature: 'push <applicationOrDevice>',
 	description:
 		'Start a remote build on the balena cloud build servers or a local mode device',
 	help: stripIndent`
-		This command can be used to start a build on the remote
-		balena cloud builders, or a local mode balena device.
+		This command can be used to start a build on the remote balena cloud builders,
+		or a local mode balena device.
 
 		When building on the balena cloud the given source directory will be sent to the
 		balena builder, and the build will proceed. This can be used as a drop-in
 		replacement for git push to deploy.
 
-		When building on a local mode device, the given source directory will be built on
-		device, and the resulting containers will be run on the device. Logs will be
-		streamed back from the device as part of the same invocation.
+		When building on a local mode device, the given source directory will be built
+		on the device, and the resulting containers will be run on the device. Logs will
+		be streamed back from the device as part of the same invocation.
+
+		The --registrySecrets option specifies a JSON or YAML file containing Docker
+		registry secrets to be used when pulling base images.
+		Sample registrySecrets JSON contents:
+			{
+				"docker.example.com": {"username": "ann", "password": "hunter2"},
+				"https://idx.docker.io/v1/": {"username": "mck", "password": "cze14"}
+			}
+		Sample registrySecrets YAML contents:
+			docker.example.com:
+				username: ann
+				password: hunter2
+			'https://idx.docker.io/v1/':
+				username: mck
+				password: cze14		
+		
 
 		Examples:
 
@@ -154,6 +212,13 @@ export const push: CommandDefinition<
 			description: "Don't use cache when building this project",
 			boolean: true,
 		},
+		{
+			signature: 'registrySecrets',
+			alias: 'R',
+			parameter: 'registrySecrets',
+			description: stripIndent`
+				Path to a local JSON or YAML file containing Docker registry secrets used when pulling base images`,
+		},
 	],
 	async action(params, options, done) {
 		const sdk = (await import('balena-sdk')).fromSharedOptions();
@@ -170,6 +235,16 @@ export const push: CommandDefinition<
 		const source = options.source || '.';
 		if (process.env.DEBUG) {
 			console.log(`[debug] Using ${source} as build source`);
+		}
+
+		let registrySecrets: object;
+		if (options.registrySecrets) {
+			registrySecrets = parseRegistrySecrets(options);
+
+			console.log(
+				'parsed registry secrets:\n',
+				JSON.stringify(registrySecrets, null, 4),
+			);
 		}
 
 		const buildTarget = getBuildTarget(appOrDevice);

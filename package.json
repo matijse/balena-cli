@@ -99,6 +99,7 @@
     "@types/through2": "^2.0.33",
     "@zeit/dockerignore": "0.0.3",
     "JSONStream": "^1.0.3",
+    "ajv": "^6.0.1",
     "ansi-escapes": "^2.0.0",
     "any-promise": "^1.3.0",
     "archiver": "^2.1.0",
